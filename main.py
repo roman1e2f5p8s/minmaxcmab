@@ -6,24 +6,28 @@ https://github.com/etiennekintzler/visualize_bandit_algorithms/blob/master/linUC
 
 import numpy as np
 from linucb import LinUCB
+from alg import Alg
 import matplotlib.pyplot as plt
 
 
 np.random.seed(123)
 
 FEATURE_DIM = 5
-N_ARMS = 10
-ALPHA = 2.5
-N_TRIALS = 5000
-# BEST_ARMS = [3, 7, 9, 15]
+N_ARMS = 16
+ALPHA = 0.0
+N_TRIALS = 2000
+BEST_ARMS = [3, 7, 9, 15]
 
 
-DATA = np.random.uniform(low=0, high=1, size=(N_TRIALS, N_ARMS, FEATURE_DIM))
+# DATA = np.random.uniform(low=0, high=1, size=(N_TRIALS, N_ARMS, FEATURE_DIM))
+DATA = np.array([[np.random.uniform(low=0, high=1, size=FEATURE_DIM) for _ in range(N_ARMS)] \
+        for _ in range(N_TRIALS)])
 
 
 def true_theta(n_arms, feature_dim):
-    theta = np.random.normal(size=(n_arms, feature_dim), scale=0.25)
-    # theta[BEST_ARMS] = theta[BEST_ARMS] + 1
+    # theta = np.random.normal(size=(n_arms, feature_dim), scale=0.25)
+    theta = np.array([np.random.normal(size=feature_dim, scale=1/4) for _ in range(n_arms)])
+    theta[BEST_ARMS] = theta[BEST_ARMS] + 1
 
     return theta
 
@@ -36,27 +40,50 @@ def reward_func(arm, context, theta, scale_noise=0.1):
 
 
 TRUE_THETA = true_theta(N_ARMS, FEATURE_DIM)
+
+DATA = np.array([[np.random.uniform(low=0, high=1, size=FEATURE_DIM) for _ in range(N_ARMS)] \
+        for _ in range(N_TRIALS)])
+TRUE_THETA = true_theta(N_ARMS, FEATURE_DIM)
+
 EXPECTED_REWARDS = np.array([
         np.max([reward_func(arm, DATA[t, arm], TRUE_THETA) for arm in range(N_ARMS)]) \
         for t in np.arange(N_TRIALS)
         ])
-estimated_rewards = np.empty(N_TRIALS)
+estimated_rewards_l = np.empty(N_TRIALS)
+estimated_rewards_a = np.empty(N_TRIALS)
 
-linucb = LinUCB(feature_dim=FEATURE_DIM, n_arms=N_ARMS, alpha=ALPHA)
+payoff_random = np.array([reward_func(arm=np.random.choice(N_ARMS), context=DATA[t, np.random.choice(N_ARMS)], theta=TRUE_THETA) for t in np.arange(DATA.shape[0])])
 
-for t in range(N_TRIALS):
-    print('t={}'.format(t), end='\r')
-    features = DATA[t]
-    chosen_arm = linucb.choose_arm(features)
+alpha_to_test = [0, 1, 2.5, 5, 10, 20]
+plt.figure(figsize=(12.5, 7.5))
 
-    reward = reward_func(chosen_arm, features[chosen_arm], TRUE_THETA)
-    linucb.update(chosen_arm, features[chosen_arm], reward)
-    estimated_rewards[t] = reward
+for alpha in alpha_to_test:
+    linucb = LinUCB(feature_dim=FEATURE_DIM, n_arms=N_ARMS, alpha=alpha)
+    # alg = Alg(feature_dim=FEATURE_DIM, n_arms=N_ARMS)
+    
+    for t in range(N_TRIALS):
+        print('t={}'.format(t), end='\r')
+        features = DATA[t]
+    
+        chosen_arm = linucb.choose_arm(features)
+        reward = reward_func(chosen_arm, features[chosen_arm], TRUE_THETA)
+        linucb.update(chosen_arm, features[chosen_arm], reward)
+        estimated_rewards_l[t] = reward
+    
+        # chosen_arm_a = alg.choose_arm(features)
+        # reward_a = reward_func(chosen_arm_a, features[chosen_arm_a], TRUE_THETA)
+        # alg.update(chosen_arm_a, features[chosen_arm_a], reward_a)
+        # estimated_rewards_a[t] = reward_a
+    
+    regret_l = np.cumsum(EXPECTED_REWARDS - estimated_rewards_l)
+    # regret_a = np.cumsum(EXPECTED_REWARDS - estimated_rewards_a)
+    
+    plt.plot(regret_l, label='alpha: ' + str(alpha))
 
-regret = np.cumsum(EXPECTED_REWARDS - estimated_rewards)
-
-plt.plot(regret)
+plt.plot(np.cumsum(EXPECTED_REWARDS - payoff_random), label = "random", linestyle='--')
+# plt.plot(regret_a, label='Alg')
 plt.xlabel('Trials')
 plt.ylabel('Regret')
 # plt.ylim([0,5000])
+plt.legend()
 plt.show()
