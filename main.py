@@ -14,14 +14,16 @@ import matplotlib.pyplot as plt
 np.random.seed(123)
 
 FEATURE_DIM = 5
-N_ARMS = 16
-N_TRIALS = 2000
+N_ARMS = 1
+N_TRIALS = 10000
+T = 5000
 ALPHA = 2.5
 BEST_ARMS = [3, 7, 9, 15]
+BEST_ARMS = [3, 4]
 
 LINUCB = (1 == 1)
 ALG = (1 == 1)
-TEST = (1 == 0)
+TEST = (1 == 1)
 
 
 def true_theta(n_arms, feature_dim):
@@ -31,21 +33,22 @@ def true_theta(n_arms, feature_dim):
     return theta
 
 
-def reward_func(arm, context, theta, scale_noise=0.1):
-    signal = np.dot(theta[arm], context)
-    noise = np.random.normal(scale=scale_noise)# * (0.5/N_TRIALS)
-    noise = 0.0
+def reward_func(theta, context, noise=0.0):
+    signal = np.dot(theta, context)
 
     return signal + noise
 
 
 DATA = np.random.uniform(low=0, high=1, size=(N_TRIALS, N_ARMS, FEATURE_DIM))
 TRUE_THETA = true_theta(N_ARMS, FEATURE_DIM)
+NOISE = np.random.normal(scale=0.1, size=N_TRIALS)
 
 if TEST:
     DATA = dummy_data.DATA
     TRUE_THETA = dummy_data.TRUE_THETA
+    NOISE = dummy_data.NOISE
     N_TRIALS, N_ARMS, FEATURE_DIM = DATA.shape
+    T = N_TRIALS
 
 
 EXPECTED_REWARDS = np.array([
@@ -67,18 +70,21 @@ one_minus_sum = 1
 sum_x = 0
 etas = np.empty(N_TRIALS)
 
-for t in range(N_TRIALS):
+for t in range(T):
     print('t={}'.format(t), end='\r')
     features = DATA[t]
     
     if LINUCB:
         chosen_arm = linucb.choose_arm(features)
-        reward = reward_func(chosen_arm, features[chosen_arm], TRUE_THETA)
+        reward = reward_func(TRUE_THETA[chosen_arm], features[chosen_arm], NOISE[t])
         linucb.update(chosen_arm, features[chosen_arm], reward)
         estimated_rewards_l[t] = reward
 
     if ALG:
         chosen_arm = alg.choose_arm(features)
+        for arm in range(N_ARMS):
+            print('{:.6f} '.format(alg.beta[arm]), end='')
+        print()
 
         # dot = alg.R.dot(features[chosen_arm]).dot(features[chosen_arm])
         # eta = np.sqrt(one_minus_sum / dot / N_TRIALS)
@@ -90,18 +96,18 @@ for t in range(N_TRIALS):
         # print(eta, x)
         # exit()
     
-        reward = reward_func(chosen_arm, features[chosen_arm], TRUE_THETA)# + eta
+        reward = reward_func(TRUE_THETA[chosen_arm], features[chosen_arm], NOISE[t])
         alg.update(chosen_arm, features[chosen_arm], reward)
         estimated_rewards_a[t] = reward
 
 if LINUCB:
-    regret_l = np.cumsum(EXPECTED_REWARDS - estimated_rewards_l)
+    regret_l = np.cumsum(EXPECTED_REWARDS[:T] - estimated_rewards_l[:T])
     plt.plot(regret_l, label='LinUCB')
 if ALG:
-    regret_a = np.cumsum(EXPECTED_REWARDS - estimated_rewards_a)
+    regret_a = np.cumsum(EXPECTED_REWARDS[:T] - estimated_rewards_a[:T])
     plt.plot(regret_a, label='Alg')
 
 plt.xlabel('Trials')
 plt.ylabel('Regret')
 plt.legend()
-plt.show()
+# plt.show()

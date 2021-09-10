@@ -10,9 +10,9 @@ class Alg:
         self.Y = np.zeros(shape=(n_arms, feature_dim), dtype=np.float64)                # F.T * R
 
         # TODO: in general, C, R, S can be different for each arm
-        self.C = 0.5 * np.identity(n=feature_dim, dtype=np.float64)
-        self.R = 10 * np.identity(n=feature_dim, dtype=np.float64)
-        self.S = 1.0 * np.identity(n=feature_dim, dtype=np.float64)
+        self.C = 1 * np.identity(n=feature_dim, dtype=np.float64)
+        self.R = 1 * np.identity(n=feature_dim, dtype=np.float64)
+        self.S = 1 * np.identity(n=feature_dim, dtype=np.float64)
         self.R_inv = np.linalg.inv(self.R)
         self.S_inv = np.linalg.inv(self.S)
 
@@ -62,6 +62,9 @@ class Alg:
                     self.P_inv[arm] @ self.C.T @ self.S @ self.C @ self.P_inv[arm]
                     ).dot(self.Theta[arm]), self.Theta[arm])
         z = np.linalg.inv(self.P_inv[arm]).dot(self.Theta[arm]).dot(self.Theta[arm])
+        # print(self.Theta[arm])
+        # print(np.linalg.eigvals(self.P_inv[arm]))
+        # print(z)
 
         self.alpha[arm] += (x - y)
         self.beta[arm] = 1 - self.alpha[arm] + z
