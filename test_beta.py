@@ -17,16 +17,15 @@ FEATURE_DIM = 5
 N_ARMS = 16
 N_TRIALS = 2000
 ALPHA = 2.5
-BEST_ARMS = [3, 7, 9, 15]
-
 LINUCB = (1 == 1)
 ALG = (1 == 1)
 TEST = (1 == 0)
+BEST_ARMS = [3, 7, 9, 15]
 
 
 def true_theta(n_arms, feature_dim):
     theta = np.random.normal(size=(n_arms, feature_dim), scale=0.25)
-    # theta[BEST_ARMS] = theta[BEST_ARMS] + 1
+    theta[BEST_ARMS] = theta[BEST_ARMS] + 1
 
     return theta
 
@@ -34,7 +33,7 @@ def true_theta(n_arms, feature_dim):
 def reward_func(arm, context, theta, scale_noise=0.1):
     signal = np.dot(theta[arm], context)
     noise = np.random.normal(scale=scale_noise)# * (0.5/N_TRIALS)
-    noise = 0.0
+    # noise = 0.0
 
     return signal + noise
 
@@ -60,12 +59,13 @@ if LINUCB:
     estimated_rewards_l = np.empty(N_TRIALS)
 
 if ALG:
-    alg = Alg(feature_dim=FEATURE_DIM, n_arms=N_ARMS)
+    alg = Alg(feature_dim=FEATURE_DIM, n_arms=N_ARMS, alpha=ALPHA)
     estimated_rewards_a = np.empty(N_TRIALS)
 
 one_minus_sum = 1
 sum_x = 0
 etas = np.empty(N_TRIALS)
+alphas = np.empty((N_ARMS, N_TRIALS))
 
 for t in range(N_TRIALS):
     print('t={}'.format(t), end='\r')
@@ -79,6 +79,7 @@ for t in range(N_TRIALS):
 
     if ALG:
         chosen_arm = alg.choose_arm(features)
+        alphas[:, t] = alg.alpha
 
         # dot = alg.R.dot(features[chosen_arm]).dot(features[chosen_arm])
         # eta = np.sqrt(one_minus_sum / dot / N_TRIALS)
@@ -93,6 +94,13 @@ for t in range(N_TRIALS):
         reward = reward_func(chosen_arm, features[chosen_arm], TRUE_THETA)# + eta
         alg.update(chosen_arm, features[chosen_arm], reward)
         estimated_rewards_a[t] = reward
+
+# print('sum_x =', sum_x)
+# for arm in range(N_ARMS):
+    # plt.plot(alphas[arm], label=str(arm))
+# plt.legend()
+# plt.show()
+# exit()
 
 if LINUCB:
     regret_l = np.cumsum(EXPECTED_REWARDS - estimated_rewards_l)

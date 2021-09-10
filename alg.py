@@ -2,7 +2,7 @@ import numpy as np
 
 
 class Alg:
-    def __init__(self, feature_dim, n_arms, alpha):
+    def __init__(self, feature_dim, n_arms):
         self.feature_dim = feature_dim
         self.n_arms = n_arms
         
@@ -21,6 +21,7 @@ class Alg:
         self.alpha = np.zeros(shape=n_arms, dtype=np.float64)
         self.beta = np.ones(shape=n_arms, dtype=np.float64)
         self.arm = 0
+        self.t = 0
 
         for arm in range(n_arms):
             # self.P_inv[arm] = np.linalg.inv(self.S[arm] + self.H[arm].T @ self.R[arm] @ self.H[arm])
@@ -31,15 +32,6 @@ class Alg:
         self.p = np.empty(shape=n_arms, dtype=np.float64)
 
     def choose_arm(self, features):
-        # arm = self.arm
-        # if arm == self.arm:
-        # print('Played arm:', self.arm)
-        # print('BEFORE UPDATING:')
-        # print('alpha[0]={:.6f}, alpha[1]={:.6f}; beta[0]={:.6f}, beta[1]={:.6f}'.format(
-            # self.alpha[0], self.alpha[1], self.beta[0], self.beta[1]))
-        # print('UPDATES: alpha = alpha + x - y; beta = 1 - alpha + z')
-        # print('{:3s}\t{:10s}\t{:10s}\t{:10s}\t{:10s}\t{:10s}'.format(
-            # 'arm', 'x', 'y', 'z', 'alpha', 'beta'))
         for arm in range(self.n_arms):
             V = self.S_inv + self.C @ self.P_inv[arm] @ self.C.T
 
@@ -54,9 +46,8 @@ class Alg:
             self.p[arm] = np.dot(features[arm], self.Theta[arm]) + \
                     np.sqrt(self.beta[arm] * np.dot(self.P_inv[arm].dot(features[arm]), features[arm]))
 
-        # self.R *= 0.1
         self.arm = np.argmax(self.p)
-        # print()
+        self.t += 1
 
         return self.arm
 
@@ -75,8 +66,6 @@ class Alg:
         self.alpha[arm] += (x - y)
         self.beta[arm] = 1 - self.alpha[arm] + z
 
-        # print('{:3d}\t{:.6f}\t{:.6f}\t{:.6f}\t{:.6f}\t{:.6f}'.format(
-            # arm, x, y, z, self.alpha[arm], self.beta[arm]))
         if self.beta[arm] < 0:
-            print('Failed for arm:', arm)
+            print('Negative beta for arm {} at time {}'.format(arm, self.t))
             exit()
