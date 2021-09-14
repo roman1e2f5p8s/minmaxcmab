@@ -56,6 +56,7 @@ payoff_random = np.array([reward_func(arm=np.random.choice(N_ARMS),
     context=DATA[t, np.random.choice(N_ARMS)], theta=TRUE_THETA) for t in np.arange(DATA.shape[0])])
 
 alpha_to_test = [0, 1, 2.5, 5, 10, 20]
+alpha_to_test = [2.5]
 plt.figure(figsize=(12.5, 7.5))
 
 for alpha in alpha_to_test:
@@ -74,7 +75,7 @@ for alpha in alpha_to_test:
     
     plt.plot(regret, label='alpha: ' + str(alpha))
 
-plt.plot(np.cumsum(EXPECTED_REWARDS - payoff_random), label = "random", linestyle='--')
+# plt.plot(np.cumsum(EXPECTED_REWARDS - payoff_random), label = "random", linestyle='--')
 plt.xlabel('Trials')
 plt.ylabel('Regret')
 plt.legend()
