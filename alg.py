@@ -34,7 +34,7 @@ class Alg:
 
             # sanity check
             assert 0 < self.beta[arm] < 1
-            assert (np.linalg.norm(self.Theta[arm] - true_theta[arm]) < \
+            assert (np.linalg.norm(self.Theta[arm] - true_theta[0, arm]) < \
                     np.sqrt(self.beta[arm] * (1 / np.linalg.eig(self.P[arm])[0]).max()))
 
         self.p = np.empty_like(self.alpha)
@@ -82,22 +82,22 @@ class Alg:
 
         assert 0 < self.beta[arm] < 1
         # TODO: uncomment the assertion if necessary
-        # assert (np.linalg.norm(self.Theta[arm] - true_theta[arm]) < \
+        # assert (np.linalg.norm(self.Theta[arm] - true_theta[self.t-1, arm]) < \
                 # np.sqrt(self.beta[arm] * (1 / np.linalg.eig(self.P[arm])[0]).max()))
-        self.S *= 1.0001
+        # self.S *= 1.0001
     
     def _idle(self, features, true_theta):
-        BEST_ARMS = [3, 7, 9, 15]
+        # BEST_ARMS = [3, 7, 9, 15]
         for arm in range(self.n_arms):
             self.R[arm] = 1.0 * np.identity(n=self.R.shape[1], dtype=np.float64)
-            if arm in BEST_ARMS:
-                self.R[arm] *= 1.2
+            # if arm in BEST_ARMS:
+                # self.R[arm] *= 1.2
 
-            self.Y[arm] = features[arm].dot(true_theta[arm]) + 0.01 * np.random.randn()
+            self.Y[arm] = features[arm].dot(true_theta[0, arm]) + 0.01 * np.random.randn()
             self.H[arm] = features[arm]
 
             # sanity check
-            x = self.Y[arm] - self.H[arm].dot(true_theta[arm])
-            iTheta = np.dot(self.S0.dot(true_theta[arm]), true_theta[arm]) +\
+            x = self.Y[arm] - self.H[arm].dot(true_theta[0, arm])
+            iTheta = np.dot(self.S0.dot(true_theta[0, arm]), true_theta[0, arm]) +\
                     np.dot(self.R[arm].dot(x), x)
             assert iTheta <= 1

@@ -6,7 +6,7 @@ https://github.com/etiennekintzler/visualize_bandit_algorithms/blob/master/linUC
 
 import numpy as np
 from linucb import LinUCB
-from dlinucbd import DLinUCBD
+from dlinucb import DLinUCB
 from alg import Alg
 # import dummy_data
 import matplotlib.pyplot as plt
@@ -14,18 +14,14 @@ import matplotlib.pyplot as plt
 
 np.random.seed(123)
 
-FEATURE_DIM = 5
-N_ARMS = 16
-N_TRIALS = 50000
+FEATURE_DIM = 2
+N_ARMS = 1
+N_TRIALS = 6000
 T = N_TRIALS
 ALPHA = 2.5
 SIGMA = 0.01
-STATIONARY = False # setting this to True will make gamma = 1!!!
-THETA_CHANGE_POINT = 2000
 
-SCALE_IN_FEATURES = 0.51  # was uniform (0, 1)
-SCALE_IN_THETA = 0.25  # was 0.25
-BEST_ARMS = [] # was [3, 7, 9, 15]
+SCALE_IN_FEATURES = 0.01 #0.25
 
 LINUCB = (1 == 1)
 DLINUCB = (1 == 1)
@@ -37,41 +33,31 @@ def get_features(n_trials, n_arms, feature_dim, scale):
     features = np.empty(shape=(n_trials, n_arms, feature_dim))
 
     for t in range(n_trials):
-        features[t] = np.random.uniform(low=0, high=1, size=(n_arms, feature_dim))
-        # features[t] = np.random.normal(size=(n_arms, feature_dim), scale=scale)
-
-        if DLINUCB:
-            try:
-                assert np.linalg.norm(features[t], axis=1).all() <= 1
-            except AssertionError:
-                print("||Features|| = {} for t = {}".format(np.linalg.norm(features[t]), t))
-                exit()
+        # features[t] = np.random.uniform(low=0, high=1, size=(n_arms, feature_dim))
+        features[t] = np.random.normal(size=(n_arms, feature_dim), scale=scale)
+        try:
+            assert np.linalg.norm(features[t]) <= 1
+        except AssertionError:
+            print("||Features|| = {} for t = {}".format(np.linalg.norm(features[t]), t))
+            exit()
 
     return features
 
 
-def get_true_theta(n_trials, n_arms, feature_dim, scale, stationary):
+def get_true_theta(n_trials, n_arms, feature_dim):
     theta = np.empty(shape=(n_trials, n_arms, feature_dim))
     
-    const_theta = np.random.normal(size=(n_arms, feature_dim), scale=scale)
-    new_theta = const_theta
-
     for t in range(n_trials):
-        if stationary:
-            theta[t] = const_theta
+        if t < 3000:
+            theta[t] = np.array([1 - t*1.0/3000, 0 + t*1.0/3000])
         else:
-            if not ((t + 1) % THETA_CHANGE_POINT):
-                new_theta = np.random.normal(size=(n_arms, feature_dim), scale=scale)
-            theta[t] = new_theta
-        if BEST_ARMS:
-            theta[t, BEST_ARMS] = theta[t, BEST_ARMS] + 1
+            theta[t] = np.array([0, 1])
         
-        if DLINUCB:
-            try:
-                assert np.linalg.norm(theta[t], axis=1).all() <= 1
-            except AssertionError:
-                print("||Theta|| = {} for t = {}".format(np.linalg.norm(theta[t]), t))
-                exit()
+        try:
+            assert np.linalg.norm(theta[t]) <= 1
+        except AssertionError:
+            print("||Theta|| = {} for t = {}".format(np.linalg.norm(theta[t]), t))
+            exit()
 
     return theta
 
@@ -84,7 +70,7 @@ def get_reward(theta, context, noise):
 
 
 DATA = get_features(N_TRIALS, N_ARMS, FEATURE_DIM, SCALE_IN_FEATURES)
-TRUE_THETA = get_true_theta(N_TRIALS, N_ARMS, FEATURE_DIM, SCALE_IN_THETA, STATIONARY)
+TRUE_THETA = get_true_theta(N_TRIALS, N_ARMS, FEATURE_DIM)
 NOISE = SIGMA * np.random.randn(N_TRIALS)
 
 if TEST:
@@ -113,13 +99,12 @@ if DLINUCB:
     L = np.ceil(max([np.linalg.norm(DATA[t]) for t in range(N_TRIALS)]))
     S = np.ceil(max([np.linalg.norm(TRUE_THETA[t]) for t in range(N_TRIALS)]))
     # BT is a variation bound (a measure of non-stationarity)
-    BT = np.array([sum([np.linalg.norm(TRUE_THETA[t, a] - TRUE_THETA[t+1, a]) \
-            for t in range(N_TRIALS-1)]) for a in range(N_ARMS)])
-    # print(BT)
+    BT = sum([np.linalg.norm(TRUE_THETA[t] - TRUE_THETA[t+1]) for t in range(N_TRIALS-1)])
+    print('BT = {:.4f}'.format(BT))
     GAMMA = 1 - np.power(BT / (FEATURE_DIM * N_TRIALS) , 2.0/3)
-    dlinucb = DLinUCBD(feature_dim=FEATURE_DIM, n_arms=N_ARMS, delta=DELTA, sigma=SIGMA, 
+    dlinucb = DLinUCB(feature_dim=FEATURE_DIM, n_arms=N_ARMS, delta=DELTA, sigma=SIGMA, 
             lambda_=LAMBDA, L=L, S=S, gamma=GAMMA)
-    # print(dlinucb)
+    print(dlinucb)
     estimated_rewards_d = np.empty(N_TRIALS)
 
 if ALG:
