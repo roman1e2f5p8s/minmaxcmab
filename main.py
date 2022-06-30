@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from linucb import LinUCB
 from dlinucbd import DLinUCBD
 from alg import Alg
-from bmm import Bmm
+from sup_bmm import SupBMM
 
 
 np.random.seed(123)
@@ -13,7 +13,7 @@ np.random.seed(123)
 
 FEATURE_DIM = 10
 N_ARMS = 20
-N_TRIALS = 9000 # number of total time steps
+N_TRIALS = 2000 # number of total time steps
 T = N_TRIALS    # number of time steps to be used for learning
 assert T <= N_TRIALS
 
@@ -33,7 +33,7 @@ BMM_DELTA = 0.01
 BMM_V = 1
 
 
-UNIFORM_FEATURES = True   # generate features using uniform distribution, otherwise use normal distr.
+UNIFORM_FEATURES = False   # generate features using uniform distribution, otherwise use normal distr.
 SCALE_IN_FEATURES = 0.51
 SCALE_IN_THETA = 0.25
 BEST_ARMS = [] # was [3, 7, 9, 15]
@@ -208,7 +208,7 @@ for run in range(N_RUNS):
         estimated_rewards_a = np.empty(N_TRIALS)
     
     if BMM:
-        bmm = Bmm(
+        bmm = SupBMM(
                 feature_dim=FEATURE_DIM,
                 n_arms=N_ARMS,
                 eps=BMM_EPS,
@@ -242,6 +242,11 @@ for run in range(N_RUNS):
             estimated_rewards_a[t] = reward
     
         if BMM:
+            rewards = [get_reward(TRUE_THETA[t, chosen_arm], features[chosen_arm], NOISE[t])]
+            rewards = rewards + [get_reward(TRUE_THETA[t, chosen_arm], features[chosen_arm],
+                np.random.standard_t(df=3)) for j in range(1, bmm.r)]
+            bmm.step(rewards=rewards, features=features)
+            exit()
             chosen_arm = bmm.choose_arm(features)
             rewards = [get_reward(TRUE_THETA[t, chosen_arm], features[chosen_arm], NOISE[t])]
             rewards = rewards + [get_reward(TRUE_THETA[t, chosen_arm], features[chosen_arm],
