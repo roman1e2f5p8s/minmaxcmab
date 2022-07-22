@@ -25,32 +25,44 @@ class SupBMM:
 
         self.S = int(np.floor(np.log(T)))
 
-        self.Psi = []
-        for s in range(self.S):
-            self.Psi += [np.empty(shape=0, dtype=np.int32)]
+        self.Psi = [np.empty(shape=0, dtype=np.int32) for s in range(self.S)]
 
         self.bmm = BMM(feature_dim=feature_dim, n_arms=n_arms, eps=eps, delta=delta, v=v, T=T)
     
     def step(self, rewards, features):
+        '''
+            - rewards: 
+            - features:
+        '''
         self.t += 1
         s = 1
         A_hat = np.arange(1, self.n_arms + 1)
+        chosen_arm = None
 
-        while True:
+        while chosen_arm is None:
             r_hat, w = self.bmm.step(t=self.t, rewards=rewards, features=features, Psi=self.Psi[s - 1])
 
             if (w[A_hat - 1] <= 1.0 / np.sqrt(self.T)).all():
                 max_val = np.max(r_hat[A_hat - 1] + w[A_hat - 1])
-                chosen_arm = np.where((r_hat + w) == max_val)[0][0]
-            elif (w[A_hat - 1] <= np.power(2, -s)).all(): # update A_hat, s
+                chosen_arm = np.where((r_hat + w) == max_val)[0][0] # arm found
+            elif (w[A_hat - 1] > np.power(2, -s)).any(): # choose arm and update Psi
+                idx = np.where(w[A_hat - 1] > np.power(2, -s))[0][0]
+                chosen_arm = np.where(w == w[A_hat - 1][idx])[0][0] # arm found
+                self.Psi[s - 1] = np.append(self.Psi[s - 1], self.t)
+            else: # (w[A_hat - 1] <= np.power(2, -s)).all(): # update A_hat, s
                 A_hat = np.array([a for a in A_hat if r_hat[A_hat - 1] + w[A_hat - 1] >= \
                         np.max(r_hat[A_hat - 1] + w[A_hat - 1]) - np.power(2, 1 - s)], dtype=int)
                 s += 1
-            else: # choose arm and update Psi
-                idx = np.where(w[A_hat - 1] > np.power(2, -s))[0][0]
-                chosen_arm = np.where(w == w[A_hat - 1][idx])[0][0]
-                # TODO
-                self.Psi[s - 1] = np.append(self.Psi[s - 1], self.t)
+
+        # TODO: play chosen_arm and observe r rewards
+
+
+
+
+
+
+
+
 
     
     def _alpha(self):
