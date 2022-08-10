@@ -1,14 +1,16 @@
 import numpy as np
 from termcolor import colored as tc
 import warnings
+from scipy.special import gamma as Gamma_func
 warnings.filterwarnings("error")
 
 
 class Alg:
-    def __init__(self, n_trials, feature_dim, n_arms, features, true_theta):
+    def __init__(self, n_trials, feature_dim, n_arms, features, true_theta, T):
         self.feature_dim = feature_dim
         self.n_arms = n_arms
         self.n_trials = n_trials
+        self.T = T
         
         self.H = np.zeros(shape=(n_arms, 1, feature_dim), dtype=np.float64) # F.T * F
         self.Y = np.zeros(shape=(n_arms, 1), dtype=np.float64)              # F.T * r
@@ -17,9 +19,10 @@ class Alg:
         self.C = 1.00 * np.identity(n=feature_dim, dtype=np.float64)
         # S * sum_t||(Theta_{t+1} - Theta_t)||_2^2 <= 1
         # the more stationary environment, the larger S should be selected
-        BT = np.array([sum([np.linalg.norm(true_theta[t, a] - true_theta[t+1, a])**2 \
-                for t in range(n_trials-1)]) for a in range(n_arms)]).mean()
-        self.S = (1 / BT) * np.identity(n=feature_dim, dtype=np.float64)
+        # BT = np.array([sum([np.linalg.norm(true_theta[t, a] - true_theta[t+1, a])**2 \
+                # for t in range(n_trials-1)]) for a in range(n_arms)]).mean()
+        # self.S = (1 / BT) * np.identity(n=feature_dim, dtype=np.float64)
+        self.S = 10000 * np.identity(n=feature_dim, dtype=np.float64)
         self.S0 = 1e-2 * np.identity(n=feature_dim, dtype=np.float64)
 
         self.R = np.empty(shape=(n_arms, self.H.shape[1]), dtype=np.float64)
@@ -66,7 +69,7 @@ class Alg:
 
         return self.arm
 
-    def update(self, chosen_arm, chosen_arm_features, reward, true_theta):
+    def update_nonstationary(self, chosen_arm, chosen_arm_features, reward, true_theta):
         # if self.t > 2000:
             # self.S = 1e6 * np.identity(n=self.feature_dim, dtype=np.float64)
         self.H[chosen_arm] = chosen_arm_features
@@ -95,11 +98,39 @@ class Alg:
                 # np.sqrt(self.beta[arm] * (1 / np.linalg.eig(self.P[arm])[0]).max()))
         # self.S *= 1.0001
     
+    # stationary update
+    def update(self, chosen_arm, chosen_arm_features, reward, true_theta):
+        self.H[chosen_arm] = chosen_arm_features
+        self.Y[chosen_arm] = reward
+
+        arm = chosen_arm
+        P_prev_Theta = self.P[arm].dot(self.Theta[arm])
+        
+        # TODO: alpha is not updated!
+        # self.alpha[arm] = self.alpha[arm] + np.dot(self.R[arm].dot(self.Y[arm]), self.Y[arm]) -\
+                # np.dot(P_prev_Theta, np.dot(B_prev_inv, P_prev_Theta))
+        P_prev = self.P[arm]
+        self.P[arm] = self.S @ np.linalg.solve(self.P[arm] + self.S, self.P[arm]) + \
+                (self.H[arm].T * self.R[arm]) @ self.H[arm] 
+        self.Theta[arm] = (np.linalg.solve(self.P[arm], 
+                self.S @ np.linalg.solve(P_prev + self.S, P_prev_Theta)) + \
+            self.H[arm].T * self.R[arm] * self.Y[arm])[:, 0]
+        # self.beta[arm] = 1 - self.alpha[arm] + np.dot(self.P[arm].dot(self.Theta[arm]),
+                # self.Theta[arm])
+        self.beta[arm] = 1
+
+    
     def _idle(self, features, true_theta):
         # BEST_ARMS = [3, 7, 9, 15]
+        c = 3
+        x = 1 / (c * self.T)
+        R_x = 1000
+        print('R const', R_x * x)
+        print('x', x)
+        print('# TODO: alpha is not updated!')
         for arm in range(self.n_arms):
             # TODO: change R here
-            self.R[arm] = 2 * np.identity(n=self.R.shape[1], dtype=np.float64)
+            self.R[arm] = R_x * x * np.identity(n=self.R.shape[1], dtype=np.float64)
             # if arm in BEST_ARMS:
                 # self.R[arm] *= 1.2
 

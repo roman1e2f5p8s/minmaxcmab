@@ -2,7 +2,8 @@ import numpy as np
 
 
 class BMM:
-    def __init__(self, feature_dim: int, n_arms: int, eps: float, delta: float, v: float, T: int):
+    def __init__(self, feature_dim: int, n_arms: int, eps: float, delta: float, v: float, T: int,
+            r: int):
         assert (feature_dim > 0 and type(feature_dim) == int)
         self.feature_dim = feature_dim  # d in the paper
 
@@ -15,64 +16,60 @@ class BMM:
 
         assert 0 < delta <= 1
         self.delta = delta
-        self.r = int(np.ceil(8 * np.log(2 * n_arms * T * np.log(T) / delta)))
+
+        self.r = r
         
         assert (T > 0 and type(T) == int)
         self.T = T
+        self.t = 0
 
-        self.arms = np.empty(shape=T, dtype=np.int32)
-        
-        # BMM requires storing contexts x for each time t and each arm a 
-        self.x = np.zeros(shape=(T, n_arms, feature_dim), dtype=np.float64)
-
-        self.A_inv = None
-
-        self.reward = np.zeros(shape=(self.r, T, n_arms), dtype=np.float64)
+        # self.arms = np.empty(shape=0, dtype=np.int32) # updated in SupBMM
+        self.x = np.zeros(shape=(0, feature_dim), dtype=np.float64) # updated in SupBMM
 
     def _alpha(self):
+        '''
+        '''
         return np.power(12 * self.v, 1 / (1 + self.eps)) * np.power(self.t + 1, 0.5 * (1 - self.eps) /\
                 (1 + self.eps))
 
-    def step(self, t, rewards, features, Psi):
-        # rewards --- self.r rewards received when playing choose_arm arm self.r times
+    def step(self, rewards, features, Psi):
+        '''
+        Inputs:
+            - rewards: self.r rewards received when playing choose_arm arm self.r times
+            - features: array of shape (n_arms, feature_dim)
+            - Psi: vector of length up to t, contains indices starting from zero
+        Returns:
+            - r_hat: vector of length self.n_arms
+            - w: vector of length self.n_arms
+        '''
         A = np.identity(n=self.feature_dim, dtype=np.float64)
+        A_inv = np.identity(n=self.feature_dim, dtype=np.float64)
 
+        b = np.zeros(shape=(self.r, self.feature_dim), dtype=np.float64)
         Theta_hat = np.zeros(shape=(self.r, self.feature_dim), dtype=np.float64)
 
         for j in range(self.r):
-            b = np.zeros(shape=(self.r, self.feature_dim), dtype=np.float64)
             for tau in Psi:
                 if not j:
-                    A += self.x[tau-1, self.arms[tau-1]] @ self.x[tau-1, self.arms[tau-1]].T
-                if tau == Psi[0]:
-                    self.reward[j, t, self.arms[t]] = rewards[j]
-                b[j] += self.reward[j, tau-1, self.arms[tau-1]] * self.x[tau-1, self.arms[tau-1]]
+                    A += self.x[tau] @ self.x[tau].T
+                b[j] += rewards[j] * self.x[tau]
             if not j:
-                self.A_inv = np.linalg.inv(A)
-            Theta_hat[j] = np.dot(self.A_inv, b[j])
+                A_inv = np.linalg.inv(A)
+            Theta_hat[j] = np.dot(A_inv, b[j])
 
         r_hat = np.empty(shape=self.n_arms, dtype=np.float64)
         w = np.empty(shape=self.n_arms, dtype=np.float64)
 
-        for i, arm in enumerate(self.n_arms):
-            self.x[t, arm] = features[arm]
-
-            r_hat[i] = np.median(np.array(
-                    [np.dot(self.x[t, arm].T, Theta_hat[j]) for j in range(self.r)],
-                    dtype=np.float64,
+        for arm in range(self.n_arms):
+            r_hat[arm] = np.median(
+                    np.array(
+                        [np.dot(features[arm].T, Theta_hat[j]) for j in range(self.r)],
+                        dtype=np.float64,
                     ))
 
-            w[i] = (1 + self._alpha()) * np.sqrt(
-                    np.dot(
-                        self.x[t, arm].T,
-                        np.dot(
-                            self.A_inv,
-                            self.x[t, arm]
-                            )
-                        )
+            w[arm] = (1 + self._alpha()) * np.sqrt(
+                    np.dot(features[arm].T, np.dot(A_inv, features[arm]))
                     )
+        self.t += 1
 
         return r_hat, w
-
-    def play_arm(self, t, arm):
-        self.arms[t] = arm

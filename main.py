@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+from time import time
 import matplotlib.pyplot as plt
 
 from linucb import LinUCB
@@ -13,7 +14,7 @@ np.random.seed(123)
 
 FEATURE_DIM = 10
 N_ARMS = 20
-N_TRIALS = 2000 # number of total time steps
+N_TRIALS = 1000 # number of total time steps
 T = N_TRIALS    # number of time steps to be used for learning
 assert T <= N_TRIALS
 
@@ -27,7 +28,7 @@ BABY_EXAMPLE = False  # set to True to reproduce examples from the DLinUCB paper
 THETA_CHANGE_POINT = 2000
 SLOW_VAR = False  # set to True to simulate slow varying Theta
 
-BMM_TEST = True # generate the same data as in the BMM paper
+BMM_TEST = False # generate the same data as in the BMM paper
 BMM_EPS = 1
 BMM_DELTA = 0.01
 BMM_V = 1
@@ -39,16 +40,16 @@ SCALE_IN_THETA = 0.25
 BEST_ARMS = [] # was [3, 7, 9, 15]
 
 
-N_RUNS = 1  # number of realizations
+N_RUNS = 10 # number of realizations
 MEAN = True  # plot mean or median result
 # for plotting error bars
 EVERY_ERR = int(T / 20)
 SHIFT_ERR = int(EVERY_ERR / 10)
 
 # set any number to 0 to not run a given algorithm
-LINUCB = (1 == 0)
+LINUCB = (1 == 1)
 DLINUCB = (1 == 0)
-ALG = (1 == 0)
+ALG = (1 == 1)
 BMM = (1 == 1)
 
 
@@ -165,6 +166,7 @@ if BMM:
     regret_b = np.empty((N_RUNS, N_TRIALS))
 
 
+start_time = time()
 # run N_RUNS realizations
 for run in range(N_RUNS):
     print('Realization {} out of {}'.format(run+1, N_RUNS))
@@ -196,6 +198,7 @@ for run in range(N_RUNS):
         BT = np.array([sum([np.linalg.norm(TRUE_THETA[t, a] - TRUE_THETA[t+1, a]) \
                 for t in range(N_TRIALS-1)]) for a in range(N_ARMS)])
         # print(BT)
+        # TRUE_THETA should vary with time in DLINUCB
         GAMMA = 1 - np.power(BT / (FEATURE_DIM * N_TRIALS) , 2.0/3)
         dlinucb = DLinUCBD(feature_dim=FEATURE_DIM, n_arms=N_ARMS, delta=DELTA, sigma=SIGMA, 
                 lambda_=LAMBDA, L=L, S=S, gamma=GAMMA)
@@ -203,7 +206,7 @@ for run in range(N_RUNS):
         estimated_rewards_d = np.empty(N_TRIALS)
     
     if ALG:
-        alg = Alg(N_TRIALS, FEATURE_DIM, N_ARMS, DATA[0], TRUE_THETA)
+        alg = Alg(N_TRIALS, FEATURE_DIM, N_ARMS, DATA[0], TRUE_THETA, T)
         # ub = np.empty((N_TRIALS, N_ARMS))
         estimated_rewards_a = np.empty(N_TRIALS)
     
@@ -242,17 +245,13 @@ for run in range(N_RUNS):
             estimated_rewards_a[t] = reward
     
         if BMM:
+            chosen_arm = bmm.choose_arm(features=features)
             rewards = [get_reward(TRUE_THETA[t, chosen_arm], features[chosen_arm], NOISE[t])]
-            rewards = rewards + [get_reward(TRUE_THETA[t, chosen_arm], features[chosen_arm],
-                np.random.standard_t(df=3)) for j in range(1, bmm.r)]
-            bmm.step(rewards=rewards, features=features)
-            exit()
-            chosen_arm = bmm.choose_arm(features)
-            rewards = [get_reward(TRUE_THETA[t, chosen_arm], features[chosen_arm], NOISE[t])]
-            rewards = rewards + [get_reward(TRUE_THETA[t, chosen_arm], features[chosen_arm],
+            rewards += [get_reward(TRUE_THETA[t, chosen_arm], features[chosen_arm],
                 np.random.standard_t(df=3)) for j in range(1, bmm.r)]
             rewards = np.array(rewards)
-            bmm.update(rewards)
+            bmm.rewards = rewards.copy()
+            # chosen_arm = bmm.step(rewards=rewards, features=features)
             estimated_rewards_b[t] = np.median(rewards)
     
     # compute theta error for min-max CMAB algorithm
@@ -269,7 +268,7 @@ for run in range(N_RUNS):
         regret_a[run] = np.cumsum(EXPECTED_REWARDS[:T] - estimated_rewards_a[:T])
     if BMM:
         regret_b[run] = np.cumsum(EXPECTED_REWARDS[:T] - estimated_rewards_b[:T])
-
+print('Elapsed time: {} s'.format(time() - start_time))
 
 # plot the results
 plt.figure(figsize=(12.5, 7.5))
@@ -338,7 +337,7 @@ if BMM:
     plt.plot(avg, label='BMM', color='orange')
     plt.errorbar(x=TRIALS[s*SHIFT_ERR:][::EVERY_ERR], y=avg[s*SHIFT_ERR:][::EVERY_ERR],
             yerr=[(avg - low)[s*SHIFT_ERR:][::EVERY_ERR], (up - avg)[s*SHIFT_ERR:][::EVERY_ERR]],
-            color='red', linestyle='', capsize=3)
+            color='orange', linestyle='', capsize=3)
 
 if BABY_EXAMPLE:
     if SLOW_VAR:
